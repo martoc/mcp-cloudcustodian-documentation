@@ -9,7 +9,7 @@ jobs:
   build:
     permissions:
       contents: write
-    uses: martoc/workflow-container-image/.github/workflows/default.yml@main
+    uses: martoc/workflow-container-image/.github/workflows/default.yml@v0
     with:
       platforms: linux/arm64,linux/amd64
     secrets: inherit
