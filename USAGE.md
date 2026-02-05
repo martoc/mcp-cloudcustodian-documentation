@@ -188,12 +188,14 @@ uv run cloud-custodian-docs-index --database /path/to/custom.db stats
 
 ### Search Query Syntax
 
-The search uses SQLite FTS5 with Porter stemming:
+The search uses SQLite FTS5 with Porter stemming and automatic query sanitisation:
 
 - **Stemming**: "policy" matches "policies", "policing"
 - **Phrase search**: "s3 bucket" matches documents with both terms
 - **Boolean AND**: Terms are AND'd by default
 - **Relevance**: Results ranked by BM25 algorithm
+- **Special characters**: Queries with `.`, `*`, `()`, `:` or boolean operators (`AND`, `OR`, `NOT`) are automatically sanitised to prevent syntax errors
+- **Natural queries**: Search naturally without worrying about FTS5 syntax - e.g., "s3.bucket.name" or "group policies" work as expected
 
 ### Section Filtering
 

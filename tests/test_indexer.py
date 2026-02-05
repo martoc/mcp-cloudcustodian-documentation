@@ -203,9 +203,7 @@ def test_clone_repository(mock_run: Mock, indexer: CloudCustodianDocsIndexer, tm
 
 
 @patch("subprocess.run")
-def test_clone_repository_without_sparse(
-    mock_run: Mock, indexer: CloudCustodianDocsIndexer, tmp_path: Path
-) -> None:
+def test_clone_repository_without_sparse(mock_run: Mock, indexer: CloudCustodianDocsIndexer, tmp_path: Path) -> None:
     """Test clone without sparse checkout."""
     target_path = tmp_path / "cloud-custodian"
 

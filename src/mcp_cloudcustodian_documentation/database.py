@@ -1,5 +1,6 @@
 """SQLite FTS5 database operations for Cloud Custodian documentation."""
 
+import re
 import sqlite3
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -19,6 +20,34 @@ class DocumentDatabase:
         """
         self.db_path = db_path
         self._initialise_schema()
+
+    @staticmethod
+    def _sanitise_query(query: str) -> str:
+        """Sanitise user query for FTS5 MATCH clause.
+
+        FTS5 uses special characters for query operators. This method
+        escapes problematic characters to prevent syntax errors.
+
+        Args:
+            query: Raw user query string.
+
+        Returns:
+            Sanitised query string safe for FTS5 MATCH.
+        """
+        # FTS5 special characters that have query syntax meaning
+        fts5_special_chars = r'[.():*"]'
+
+        # FTS5 boolean operators (case insensitive)
+        fts5_operators = re.compile(r"\b(AND|OR|NOT)\b", re.IGNORECASE)
+
+        # Check if query contains special characters or operators
+        if re.search(fts5_special_chars, query) or fts5_operators.search(query):
+            # Escape double quotes by doubling them
+            query = query.replace('"', '""')
+            # Wrap in quotes to treat as literal phrase
+            return f'"{query}"'
+
+        return query
 
     @contextmanager
     def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
@@ -114,6 +143,9 @@ class DocumentDatabase:
         Returns:
             List of SearchResult instances ordered by relevance.
         """
+        # Sanitise query to prevent FTS5 syntax errors
+        sanitised_query = self._sanitise_query(query)
+
         with self._get_connection() as conn:
             # Build query with optional section filter
             sql = """
@@ -128,7 +160,7 @@ class DocumentDatabase:
                 JOIN documents d ON documents_fts.rowid = d.id
                 WHERE documents_fts MATCH ?
             """
-            params: list[str | int] = [query]
+            params: list[str | int] = [sanitised_query]
 
             if section:
                 sql += " AND d.section = ?"

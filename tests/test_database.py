@@ -207,6 +207,36 @@ def test_get_document_count_empty(db: DocumentDatabase) -> None:
     assert count == 0
 
 
+def test_sanitise_query() -> None:
+    """Test FTS5 query sanitisation."""
+    # Simple queries should not be modified
+    assert DocumentDatabase._sanitise_query("simple") == "simple"
+    assert DocumentDatabase._sanitise_query("test query") == "test query"
+    assert DocumentDatabase._sanitise_query("S3") == "S3"
+
+    # Queries with periods should be wrapped in quotes
+    assert DocumentDatabase._sanitise_query("s3.bucket") == '"s3.bucket"'
+    assert DocumentDatabase._sanitise_query("test.file.name") == '"test.file.name"'
+
+    # Queries with parentheses should be wrapped
+    assert DocumentDatabase._sanitise_query("test (value)") == '"test (value)"'
+
+    # Queries with asterisks should be wrapped
+    assert DocumentDatabase._sanitise_query("test*") == '"test*"'
+
+    # Queries with colons should be wrapped
+    assert DocumentDatabase._sanitise_query("field:value") == '"field:value"'
+
+    # Queries with existing quotes should be escaped and wrapped
+    assert DocumentDatabase._sanitise_query('test "quoted"') == '"test ""quoted"""'
+
+    # Queries with boolean operators should be wrapped
+    assert DocumentDatabase._sanitise_query("test AND content") == '"test AND content"'
+    assert DocumentDatabase._sanitise_query("test OR content") == '"test OR content"'
+    assert DocumentDatabase._sanitise_query("NOT asterisks") == '"NOT asterisks"'
+    assert DocumentDatabase._sanitise_query("test and content") == '"test and content"'
+
+
 def test_search_relevance_ordering(db: DocumentDatabase) -> None:
     """Test that search results are ordered by relevance."""
     docs = [
@@ -235,3 +265,68 @@ def test_search_relevance_ordering(db: DocumentDatabase) -> None:
     # Document with more S3 mentions should rank higher
     assert results[0].path == "high.rst"
     assert results[1].path == "low.rst"
+
+
+def test_search_with_special_characters(db: DocumentDatabase) -> None:
+    """Test search with FTS5 special characters like periods."""
+    doc = Document(
+        path="aws/s3.rst",
+        title="S3 Configuration",
+        description="Configure S3 buckets",
+        section="aws",
+        content="Use s3.bucket.name for configuration",
+        url="https://cloudcustodian.io/docs/aws/s3.html",
+    )
+    db.upsert_document(doc)
+
+    # Search with period (FTS5 special character)
+    results = db.search("s3.bucket")
+    assert len(results) >= 0  # Should not raise syntax error
+
+    # Search with quotes
+    results = db.search('"s3 bucket"')
+    assert len(results) >= 0  # Should not raise syntax error
+
+
+def test_search_with_sql_keywords(db: DocumentDatabase) -> None:
+    """Test search with SQL reserved keywords."""
+    doc = Document(
+        path="test.rst",
+        title="Group Policies",
+        description="Policy groups",
+        section="examples",
+        content="Use group to organise policies",
+        url="https://cloudcustodian.io/docs/test.html",
+    )
+    db.upsert_document(doc)
+
+    # Search with SQL keyword
+    results = db.search("group")
+    assert len(results) == 1
+    assert "group" in results[0].snippet.lower() or "Group" in results[0].snippet
+
+
+def test_search_with_other_special_characters(db: DocumentDatabase) -> None:
+    """Test search with various FTS5 special characters."""
+    doc = Document(
+        path="test.rst",
+        title="Special Characters",
+        description="Test special chars",
+        section="test",
+        content="Content with (parentheses) and * asterisks",
+        url="https://cloudcustodian.io/docs/test.html",
+    )
+    db.upsert_document(doc)
+
+    # These should not raise syntax errors
+    test_queries = [
+        "test*",
+        "(parentheses)",
+        "test AND content",
+        "test OR content",
+        "NOT asterisks",
+    ]
+
+    for query in test_queries:
+        results = db.search(query)
+        assert isinstance(results, list)  # Should not raise syntax error
