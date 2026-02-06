@@ -227,6 +227,11 @@ def test_sanitise_query() -> None:
     # Queries with colons should be wrapped
     assert DocumentDatabase._sanitise_query("field:value") == '"field:value"'
 
+    # Queries with hyphens should be wrapped (regression test for "no such column" error)
+    assert DocumentDatabase._sanitise_query("marked-for-op") == '"marked-for-op"'
+    assert DocumentDatabase._sanitise_query("marked-for-op tag filter") == '"marked-for-op tag filter"'
+    assert DocumentDatabase._sanitise_query("auto-tag-user") == '"auto-tag-user"'
+
     # Queries with existing quotes should be escaped and wrapped
     assert DocumentDatabase._sanitise_query('test "quoted"') == '"test ""quoted"""'
 
@@ -328,5 +333,36 @@ def test_search_with_other_special_characters(db: DocumentDatabase) -> None:
     ]
 
     for query in test_queries:
+        results = db.search(query)
+        assert isinstance(results, list)  # Should not raise syntax error
+
+
+def test_search_with_hyphens(db: DocumentDatabase) -> None:
+    """Test search with hyphens in query (regression test for column syntax error)."""
+    doc = Document(
+        path="aws/examples.rst",
+        title="Marked for Operation Examples",
+        description="Using marked-for-op action",
+        section="aws",
+        content="The marked-for-op action allows tagging resources for future operations. "
+        "Use the tag filter to identify resources.",
+        url="https://cloudcustodian.io/docs/aws/examples.html",
+    )
+    db.upsert_document(doc)
+
+    # This query previously caused "no such column: for" error
+    results = db.search("marked-for-op tag filter")
+    assert isinstance(results, list)  # Should not raise syntax error
+    assert len(results) >= 0
+
+    # Test various hyphenated queries
+    hyphenated_queries = [
+        "marked-for-op",
+        "auto-tag-user",
+        "real-time-events",
+        "some-hyphenated-term tag filter",
+    ]
+
+    for query in hyphenated_queries:
         results = db.search(query)
         assert isinstance(results, list)  # Should not raise syntax error

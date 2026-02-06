@@ -35,7 +35,8 @@ class DocumentDatabase:
             Sanitised query string safe for FTS5 MATCH.
         """
         # FTS5 special characters that have query syntax meaning
-        fts5_special_chars = r'[.():*"]'
+        # Including hyphen to prevent "no such column" errors with hyphenated terms
+        fts5_special_chars = r'[.():*"\-]'
 
         # FTS5 boolean operators (case insensitive)
         fts5_operators = re.compile(r"\b(AND|OR|NOT)\b", re.IGNORECASE)
