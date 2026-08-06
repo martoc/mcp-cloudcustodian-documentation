@@ -26,6 +26,9 @@ RUN uv sync --locked --no-dev
 # Build the index at container build time
 RUN uv run --no-sync cloud-custodian-docs-index index
 
+# Port used when MCP_TRANSPORT=http (ignored for the default stdio transport)
+EXPOSE 8000
+
 # Run the MCP server directly from the baked venv so no dependency
 # resolution happens on container start
 CMD ["/app/.venv/bin/mcp-cloudcustodian-documentation"]
